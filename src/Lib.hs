@@ -10,11 +10,12 @@ module Lib
 
 import Text.Parsec
 import qualified Data.DList as DL
-import Control.Monad (void, msum, join)
+import Control.Monad (void, msum, join, mzero)
 import Data.Foldable (foldrM)
 import qualified Control.Monad.Trans.State as ST
 import Data.Functor (($>))
 import Text.Parsec.Char
+import Data.Csv
 
 data Flow a = Flow {
     flowName :: String,
@@ -61,8 +62,22 @@ lineItem = do
 
 data BudgetLine a = LineItem (Flow a) | Comment String | Sum a deriving (Show, Eq)
 
+instance FromField a => FromRecord (BudgetLine a) where
+    parseRecord v 
+        | length v < 1 = mzero
+        | otherwise = v .! 0 >>= (\name -> case name of
+            "Flow" -> LineItem <$> (Flow <$> v .! 1 <*> v .! 2)
+            "Comment" -> Comment <$> v .! 1
+            "Sum" -> Sum <$> v .! 1
+            _ -> mzero)
+
+instance ToField a => ToRecord (BudgetLine a) where
+    toRecord (Sum v) = record [toField "Sum", toField v]
+    toRecord (LineItem f) = record [toField "Flow", (toField . flowName) f, (toField . flowValue) f]
+    toRecord (Comment s) = record [toField "Comment", toField s]
+
 sectionSum :: Num a => Parsec String () (BudgetLine a)
-sectionSum = char '=' $> Sum 0
+sectionSum = char '=' $> Sum 0 <* optional (spaces *> manyTill anyChar (try . lookAhead $ eol))
 
 comment :: Parsec String () (BudgetLine a)
 comment = Comment <$> manyTill anyChar (try . lookAhead $ eol)
@@ -73,46 +88,17 @@ budgetLine = LineItem <$> lineItem
 readLine :: (Floating a, Read a) => Parsec String () (BudgetLine a)
 readLine = try budgetLine <|> sectionSum <|> comment
 
-data BudgetState a = BudgetState {
-    currentFlows :: [Flow a],
-    output :: DL.DList (BudgetLine a)
-}
-
-
-flush :: Floating a => ST.State (BudgetState a) ()
-flush = ST.modify
-  (\bs -> bs
-    { currentFlows = []
-    , output       = output bs
-      `DL.append` (DL.fromList . map LineItem . currentFlows) bs
-    }
-  )
-
-runBudgetLine :: Floating a => BudgetLine a -> ST.State (BudgetState a) ()
-runBudgetLine (Comment s) =
-  ST.modify (\bs -> bs { output = output bs `DL.snoc` Comment s })
-
-runBudgetLine (LineItem f) =
-  ST.modify (\bs -> bs { currentFlows = f : currentFlows bs, output = output bs `DL.snoc` LineItem f})
-
-runBudgetLine (Sum v) = ST.modify
-  (\bs -> bs
-    { currentFlows = []
-    , output       = output bs
-      `DL.append` (DL.singleton . Sum . sum . map flowValue . currentFlows $ bs)
-    }
-  )
+runBudgetLine :: Floating a => BudgetLine a -> ST.State [Flow a] (BudgetLine a)
+runBudgetLine (Comment s) = return $ Comment s
+runBudgetLine (LineItem f) = ST.modify (\bs -> f:bs) >> return (LineItem f)
+runBudgetLine (Sum v) = do 
+    stck <- ST.get
+    ST.put []
+    return . Sum . sum . map flowValue $ stck
 
 runBudget :: Floating a => [BudgetLine a] -> [BudgetLine a]
-runBudget lines = ST.evalState
-  (do
-    mapM_ runBudgetLine lines
-    flush
-    ss <- ST.get
-    return . DL.toList . output $ ss
-  )
-  (BudgetState [] (DL.fromList []))
-
+runBudget lines = ST.evalState (mapM runBudgetLine lines) []
+  
 printBudget :: (Ord a, Floating a, Show a) => [BudgetLine a] -> String
 printBudget = unlines . map printLine
  where
