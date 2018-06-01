@@ -25,6 +25,8 @@ dependencies:
 - parsec
 - dlist
 - transformers
+- bytestring
+- cassava
 
 library:
   source-dirs: src
