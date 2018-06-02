@@ -27,6 +27,7 @@ dependencies:
 - transformers
 - bytestring
 - cassava
+- vector
 
 library:
   source-dirs: src
