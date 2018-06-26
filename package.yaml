@@ -1,13 +1,13 @@
 name:                plainbudgetting
 version:             0.1.0.0
-github:              "githubuser/plainbudgetting"
+github:              "Triagle/plainbudgetting-hs"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
 extra-source-files:
-- README.md
+- README.adoc
 - ChangeLog.md
 
 # Metadata used when publishing your package
@@ -17,10 +17,11 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/plainbudgetting#readme>
+description:         Please see the README on GitHub at <https://github.com/Triagle/plainbudgetting-hs#readme>
 
 dependencies:
 - base >= 4.7 && < 5
+- classy-prelude
 - optparse-applicative
 - parsec
 - dlist
@@ -30,11 +31,13 @@ dependencies:
 - vector
 - text
 
+default-extensions: NoImplicitPrelude OverloadedStrings
+
 library:
   source-dirs: src
 
 executables:
-  plainbudgetting-exe:
+  plbudget:
     main:                Main.hs
     source-dirs:         app
     ghc-options:

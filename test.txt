@@ -1,0 +1,48 @@
+Basic Accounting with Plain Text
+--------------------------------
+
+This accounting system is pretty much as lax as it gets. It's little 
+more than a glorified text calculator with CSV export. 
+
+You declare cash flows like this
++/- <amount> <name> <x modifier>
+e.g
++ 100 Salary
+You can see the intermediary values with sums
+- 50 Some show
+This should read as 50 after passing it to the program.
+=
+
+All other lines are considered plain text and are not parsed, even logically tricky paragraphs.
+Here is some easy-graph output, not affected:
+
++---+     +---+     +---+
+| a | --> | b | --> | c |
++---+     +---+     +---+
+
+The only bit of semantic meaning in the document is the paragraph. Parargraphs scope sums, and sums
+within a paragraph "remember" the results of previous sums.
+
+So in the following example the income is summed and then the expenses are are subtracted
+with a final sum at the end of the paragraph that takes all income and expenses into account.
+
+Income
+------
++ 1000 Salary
+=
+Expenses
+--------
+- 300 Food
+- 100 Water
+---
+We're going to save the total in a variable ">> varName" to do that
+>> Total
+=
+
+
+After a paragraph however all that scope is lost and so the following sum just returns 100 rather than 700.
++ 100 test scope
+=
+We're going to bring back Total from the previous scope now:
+<< Total
+=

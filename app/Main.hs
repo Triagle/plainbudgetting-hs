@@ -1,79 +1,30 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
-
+import ClassyPrelude
 import Lib
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Error as E
-import qualified Data.Text.Lazy as T
-import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
-import qualified Data.Text.Lazy.IO as TIO
-import Data.List as L
-import Data.Char (toLower)
-import Data.Bifunctor
-import Data.Either
-import qualified Data.Vector as V
-import Data.Semigroup ((<>))
-import Options.Applicative
-import qualified Data.Csv as C
+import Parser
+import Text.Parsec
+import Control.Monad.Trans.State (evalState)
 
-data FormatType = CSV | Plain deriving (Show)
+data FormatType = CSV | Plain deriving Show
 
-instance Read FormatType where
-    readsPrec _ str
-        | "csv" `L.isPrefixOf` map toLower str = [(CSV, drop 3 str)]
-        | "plain" `L.isPrefixOf` map toLower str = [(Plain, drop 5 str)]
-        | otherwise = []
+parseFormat :: LText -> Maybe FormatType
+parseFormat v
+    | lv == "csv" = return CSV
+    | lv == "plain" = return Plain
+    | otherwise = empty
+    where lv = toLower v
 
-data Options = Options {
-    input :: FormatType,
-    output :: FormatType
-}
+showBudget :: [AST Double] -> Text
+showBudget = unlines . map printAST
 
-parseBudget :: T.Text -> Either P.ParseError [BudgetLine Double]
-parseBudget = P.parse (readLine `P.sepBy` P.newline) ""
+runBudget :: [AST Double] -> [AST Double]
+runBudget = flip evalState emptyState . mapM evalAST
 
-processBudget :: FormatType -> FormatType -> T.Text -> T.Text
-processBudget i o = either (T.pack . show) (outputFn o . runBudget)
-  . formatFn i
- where
-  formatFn CSV = fmap V.toList . C.decode C.NoHeader . encodeUtf8
-  formatFn Plain =
-    first (mconcat . map ((<>) "\n" . E.messageString) . E.errorMessages)
-      . parseBudget
-  outputFn CSV   = decodeUtf8 . C.encode
-  outputFn Plain = printBudget
-
-opts :: Parser Options
-opts =
-  Options
-    <$> option
-          auto
-          (  long "input"
-          <> short 'i'
-          <> help "Set input type"
-          <> value Plain
-          <> showDefault
-          <> metavar "TYPE"
-          )
-    <*> option
-          auto
-          (  long "output"
-          <> short 'o'
-          <> help "Set output type"
-          <> value Plain
-          <> showDefault
-          <> metavar "TYPE"
-          )
-
-pinfo :: ParserInfo Options
-pinfo = info
-  (opts <**> helper)
-  (  fullDesc
-  <> progDesc "Parse and manage a budget through plain text."
-  <> header "plainbudgetting - a budgetting system in plain text"
-  )
-
+plBudget :: LText -> LText
+plBudget = fromStrict . either tshow showBudget . fmap runBudget . parseBudget . toStrict
+    where parseBudget = parse document ""
+        
 main :: IO ()
 main = do
-  opts <- execParser pinfo
-  TIO.interact $ processBudget (input opts) (output opts)
+    ln - getContents
+    (print . fmap runBudget . parse document "" . toStrict) ln
